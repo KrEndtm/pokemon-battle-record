@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>포켓몬 배틀 레코드</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --bg:#f4f6f8; --panel:#fff; --text:#20242a; --muted:#697581; --line:#e1e6eb;
+    --soft:#f7f9fb; --blue:#2d7ff9; --blue-soft:#eef5ff; --red:#e94b4b; --yellow:#ffcb05;
+    --header:#20242a;
+  }
+  body { margin:0; font-family:Arial,"Noto Sans KR",sans-serif; background:var(--bg); color:var(--text); }
+  header { background:var(--header); color:white; padding:16px 28px; display:flex; align-items:center; gap:20px; justify-content:space-between; position:sticky; top:0; z-index:20; box-shadow:0 2px 12px rgba(0,0,0,.12); }
+  .brand-wrap { display:flex; align-items:center; gap:18px; }
+  header h1 { margin:0; font-size:21px; white-space:nowrap; }
+  nav { display:flex; gap:8px; }
+  nav button { border:0; padding:10px 16px; border-radius:9px; cursor:pointer; font-weight:800; background:#3b424c; color:white; }
+  nav button.active { background:var(--yellow); color:#222; }
+
+  .battle-mode-switch { display:flex; background:#11151a; padding:4px; border-radius:999px; gap:4px; }
+  .battle-mode-switch button { border:0; border-radius:999px; background:transparent; color:#aeb6c0; padding:8px 15px; cursor:pointer; font-weight:800; transition:.18s; }
+  .battle-mode-switch button.active { background:white; color:#20242a; box-shadow:0 2px 8px rgba(0,0,0,.2); }
+  .battle-mode-switch button.double.active { background:#6d5dfc; color:white; }
+
+  main { max-width:1160px; margin:28px auto; padding:0 20px 50px; }
+  .mode-page-title { display:flex; align-items:center; gap:10px; margin-bottom:16px; font-size:14px; font-weight:800; color:var(--muted); }
+  .mode-dot { width:10px; height:10px; border-radius:50%; background:var(--blue); }
+  body[data-mode="double"] .mode-dot { background:#6d5dfc; }
+  .page { display:none; }
+  .page.active { display:block; }
+  .panel { background:var(--panel); border-radius:15px; padding:22px; box-shadow:0 4px 18px rgba(0,0,0,.06); margin-bottom:20px; }
+  .panel-title-row { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+  h2 { margin:0; font-size:20px; }
+  h3 { margin:0 0 12px; font-size:16px; }
+  .hint { color:var(--muted); font-size:13px; }
+  .mode-hint { margin-top:-6px; margin-bottom:14px; }
+
+  .preset-box { background:#f6f8fa; border:1px solid #e1e6eb; border-radius:12px; padding:14px; margin-bottom:18px; }
+  .preset-head { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:10px; }
+  .preset-controls { display:grid; grid-template-columns:minmax(220px,1fr) auto auto auto auto; gap:8px; }
+  .preset-preview { margin-top:10px; padding:10px 12px; background:#fff; border:1px solid #e1e6eb; border-radius:10px; display:none; }
+  .preset-preview.show { display:block; }
+  .preset-preview-title { font-size:12px; font-weight:700; color:#6b7280; margin-bottom:7px; }
+  .preset-preview-list { display:flex; flex-wrap:wrap; gap:6px; }
+  .preset-preview-chip { font-size:12px; font-weight:700; padding:5px 8px; border-radius:999px; background:#eef2f6; color:#26323d; border:1px solid #dfe5eb; }
+  select, .text-input { width:100%; border:1px solid #cdd5dd; border-radius:9px; background:white; padding:10px 11px; font-size:14px; }
+
+  .entry-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .entry-card { min-height:86px; border:2px solid #dde2e7; border-radius:12px; padding:16px; cursor:pointer; transition:.15s; background:#fafbfc; display:flex; flex-direction:column; justify-content:center; }
+  .entry-card:hover { border-color:#9ca6b2; }
+  .entry-card.selected { border-color:var(--blue); background:var(--blue-soft); }
+  body[data-mode="double"] .entry-card.selected { border-color:#6d5dfc; background:#f1efff; }
+  .entry-card.editing { cursor:default; justify-content:flex-start; min-height:130px; }
+  .entry-card.empty-slot { opacity:.72; }
+  .entry-card input[type="text"] { width:100%; padding:10px 11px; border:1px solid #ccd3da; border-radius:8px; font-size:15px; margin-top:10px; }
+  .select-row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .select-badge { font-size:12px; font-weight:800; padding:4px 8px; border-radius:999px; background:#e9edf1; white-space:nowrap; }
+  .entry-card.selected .select-badge { background:var(--blue); color:white; }
+  body[data-mode="double"] .entry-card.selected .select-badge { background:#6d5dfc; }
+  .entry-edit-actions { display:flex; justify-content:flex-end; margin-top:9px; }
+
+  .entry-bottom-row { display:flex; justify-content:space-between; align-items:center; gap:14px; margin-top:18px; }
+  .entry-bottom-row .toolbar { margin-top:0; }
+  .roster-edit-button-row { display:flex; justify-content:flex-end; margin-top:0; margin-left:auto; }
+  .roster-edit-btn { border:0; padding:12px 20px; border-radius:10px; cursor:pointer; font-weight:900; font-size:14px; background:var(--red); color:white; box-shadow:0 3px 9px rgba(233,75,75,.22); }
+  .roster-edit-btn:hover { filter:brightness(.94); }
+
+  .toolbar { display:flex; gap:10px; align-items:center; margin-top:16px; flex-wrap:wrap; }
+  button.primary, button.secondary, button.danger, button.outline-danger, button.mini { border:0; padding:10px 16px; border-radius:9px; cursor:pointer; font-weight:800; }
+  button.primary { background:var(--blue); color:white; }
+  body[data-mode="double"] button.primary { background:#6d5dfc; }
+  button.secondary { background:#e9edf1; color:#222; }
+  button.danger { background:var(--red); color:white; }
+  button.outline-danger { background:white; color:#d83d3d; border:1px solid #efb0b0; }
+  button.mini { padding:9px 12px; background:#e9edf1; font-size:13px; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+
+  .battle-form { display:none; }
+  .battle-form.active { display:block; }
+  .battle-row { display:grid; grid-template-columns:1fr 330px; gap:18px; align-items:center; padding:16px 0; border-bottom:1px solid #edf0f2; }
+  .battle-row:last-child { border-bottom:0; }
+  .battle-pokemon-name { font-size:17px; }
+  .kill-counter { display:grid; grid-template-columns:76px 1fr 76px; gap:9px; align-items:center; }
+  .counter-btn { height:60px; border:0; border-radius:12px; background:#e9edf1; color:#222; font-size:30px; font-weight:900; cursor:pointer; }
+  .counter-btn:hover { background:#dce2e8; }
+  .kill-value { height:60px; border:2px solid #cdd5dd; border-radius:12px; background:white; text-align:center; font-size:27px; font-weight:900; width:100%; }
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+  input[type=number] { -moz-appearance:textfield; }
+  .result-choice { display:flex; gap:14px; margin:18px 0; }
+  .result-choice label { display:flex; align-items:center; gap:8px; padding:12px 18px; border:1px solid #ccd3da; border-radius:9px; cursor:pointer; font-weight:800; }
+
+  .saved-actions { display:none; margin-top:18px; padding:17px; border:1px solid #bfe1ca; border-radius:12px; background:#f2fbf5; }
+  .saved-actions.active { display:block; }
+  .saved-message { font-weight:900; color:#16713a; margin-bottom:10px; }
+
+  .summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px; }
+  .summary-card { border:1px solid #e0e5ea; border-radius:12px; padding:16px; background:#fbfcfd; }
+  .summary-card .label { color:#6a747f; font-size:13px; }
+  .summary-card .value { margin-top:6px; font-size:24px; font-weight:900; }
+  table { width:100%; border-collapse:collapse; }
+  th,td { padding:12px 10px; border-bottom:1px solid #e6eaee; text-align:center; }
+  th { background:#f5f7f9; font-size:13px; }
+  td:first-child,th:first-child { text-align:left; }
+  .win { color:#178444; font-weight:900; }
+  .loss { color:#c13c3c; font-weight:900; }
+  .empty { color:#7a848f; text-align:center; padding:28px 0; }
+
+  .history-item { border:1px solid #e1e6eb; border-radius:10px; padding:13px 14px; margin-top:10px; display:grid; grid-template-columns:135px 1fr 75px 145px; gap:12px; align-items:center; }
+  .history-team { font-size:14px; line-height:1.8; }
+  .history-actions { display:flex; gap:6px; justify-content:flex-end; }
+  .small-btn { border:0; border-radius:7px; padding:8px 11px; cursor:pointer; background:#edf0f3; font-weight:800; }
+  .small-btn.edit { background:#e8f1ff; color:#1f6ed4; }
+  .small-btn.delete { background:#fdeaea; color:#c53535; }
+
+  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.42); display:none; align-items:center; justify-content:center; padding:24px; z-index:1000; }
+  .modal-backdrop.active { display:flex; }
+  .modal { width:min(690px,100%); max-height:90vh; overflow:auto; background:white; border-radius:16px; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+  .modal-member { display:grid; grid-template-columns:minmax(170px,1fr) 250px; gap:14px; align-items:center; padding:11px 0; border-bottom:1px solid #edf0f2; }
+  .member-name-wrap { display:flex; align-items:center; gap:8px; min-width:0; }
+  .member-name-text { font-weight:900; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .member-name-input { display:none; min-width:0; flex:1; border:1px solid #cdd5dd; border-radius:8px; padding:9px 10px; font-size:15px; }
+  .member-name-wrap.editing .member-name-text { display:none; }
+  .member-name-wrap.editing .member-name-input { display:block; }
+  .modal .kill-counter { grid-template-columns:54px 1fr 54px; }
+  .modal .counter-btn,.modal .kill-value { height:48px; }
+  .modal .counter-btn { font-size:23px; }
+  .modal .kill-value { font-size:20px; }
+
+  .account-area { display:flex; align-items:center; gap:10px; margin-left:auto; }
+  .account-chip { display:flex; align-items:center; gap:8px; background:#313842; border-radius:999px; padding:7px 11px; font-size:13px; font-weight:800; }
+  .sync-dot { width:8px; height:8px; border-radius:50%; background:#9ca3af; }
+  .sync-dot.syncing { background:#ffcb05; }
+  .sync-dot.saved { background:#37b26c; }
+  .sync-dot.error { background:#e94b4b; }
+  .logout-btn { border:0; border-radius:8px; background:#4a525e; color:white; padding:8px 11px; font-weight:800; cursor:pointer; }
+  .login-screen { position:fixed; inset:0; z-index:5000; background:linear-gradient(145deg,#eef2f7,#dfe7f1); display:flex; align-items:center; justify-content:center; padding:24px; }
+  .login-screen.hidden { display:none; }
+  .login-card { width:min(470px,100%); background:#fff; border-radius:18px; padding:28px; box-shadow:0 22px 70px rgba(20,30,45,.18); }
+  .login-card h1 { margin:0 0 8px; font-size:25px; }
+  .login-card p { margin:0 0 20px; color:#66717d; line-height:1.65; font-size:14px; }
+  .login-field { margin-top:13px; }
+  .login-field label { display:block; font-size:13px; font-weight:900; margin-bottom:6px; }
+  .login-field input { width:100%; padding:12px 13px; border:1px solid #cbd4dd; border-radius:10px; font-size:16px; }
+  .login-field input.pin { letter-spacing:8px; font-size:20px; font-weight:900; }
+  .login-btn { width:100%; margin-top:18px; border:0; border-radius:10px; background:#2d7ff9; color:white; padding:13px; font-size:15px; font-weight:900; cursor:pointer; }
+  .login-btn:disabled { opacity:.55; cursor:wait; }
+  .login-message { min-height:22px; margin-top:10px; font-size:13px; font-weight:700; }
+  .login-message.error { color:#c62828; }
+  .login-message.ok { color:#16713a; }
+  details.cloud-setup { margin-top:18px; border-top:1px solid #e6eaf0; padding-top:14px; }
+  details.cloud-setup summary { cursor:pointer; font-size:13px; font-weight:900; color:#4e5965; }
+  .setup-note { font-size:12px; color:#6f7a85; line-height:1.6; margin:10px 0; }
+  .app-shell.locked { visibility:hidden; }
+  @media(max-width:900px){
+    header { flex-wrap:wrap; }
+    .entry-grid { grid-template-columns:repeat(2,1fr); }
+    .preset-controls { grid-template-columns:1fr 1fr 1fr; }
+    .preset-controls select { grid-column:1/-1; }
+    .history-item { grid-template-columns:1fr; }
+    .history-actions { justify-content:flex-start; }
+  }
+  @media(max-width:700px){
+    .entry-grid,.summary-grid { grid-template-columns:1fr; }
+    .battle-row,.modal-member { grid-template-columns:1fr; }
+    .kill-counter { grid-template-columns:68px 1fr 68px; }
+    nav { width:100%; }
+    nav button { flex:1; }
+  }
+
+  /* Mobile / tablet responsive enhancements */
+  html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+  body { min-height:100dvh; padding-bottom:env(safe-area-inset-bottom); }
+  button, input, select { touch-action:manipulation; }
+  button { -webkit-tap-highlight-color:transparent; }
+  input, select, textarea { font-size:16px; }
+
+  @media (hover:none) {
+    .entry-card:hover { border-color:#dde2e7; }
+    .entry-card.selected:hover { border-color:var(--blue); }
+    body[data-mode="double"] .entry-card.selected:hover { border-color:#6d5dfc; }
+  }
+
+  @media(max-width:900px){
+    header {
+      position:sticky;
+      padding:12px max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left));
+      gap:10px;
+    }
+    .brand-wrap { width:100%; justify-content:space-between; gap:10px; }
+    header h1 { font-size:18px; }
+    .battle-mode-switch { flex-shrink:0; }
+    .battle-mode-switch button { min-height:44px; padding:8px 13px; }
+    .account-area { order:3; width:100%; margin-left:0; justify-content:space-between; gap:8px; }
+    .account-chip { min-width:0; flex:1; overflow:hidden; }
+    #accountNickname { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .logout-btn { min-height:44px; flex-shrink:0; }
+    nav { order:2; width:100%; }
+    nav button { min-height:46px; flex:1; }
+    main { margin:18px auto; padding:0 14px calc(32px + env(safe-area-inset-bottom)); }
+    .panel { padding:18px; border-radius:13px; }
+    .preset-head { align-items:flex-start; flex-direction:column; gap:4px; }
+    .preset-controls { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .preset-controls select { grid-column:1/-1; min-height:46px; }
+    .preset-controls button { min-height:46px; padding:10px 8px; }
+    .entry-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .entry-card { min-height:96px; padding:14px; }
+    .entry-card input[type="text"] { font-size:16px; min-height:46px; }
+    .entry-bottom-row { align-items:stretch; }
+    .entry-bottom-row .toolbar, .roster-edit-button-row { flex:1; }
+    #confirmTeamBtn, .roster-edit-btn { min-height:48px; }
+    .battle-row { grid-template-columns:minmax(0,1fr) minmax(280px,340px); gap:12px; }
+    .counter-btn, .kill-value { height:64px; }
+    .counter-btn { min-width:64px; }
+    .result-choice label { min-height:48px; }
+    .summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .history-item { grid-template-columns:1fr; gap:8px; }
+    .history-actions { justify-content:flex-start; flex-wrap:wrap; }
+    .small-btn { min-height:44px; }
+    .modal-backdrop { padding:14px; align-items:flex-end; }
+    .modal { width:100%; max-height:88dvh; border-radius:18px 18px 0 0; padding:18px; padding-bottom:calc(18px + env(safe-area-inset-bottom)); }
+  }
+
+  @media(max-width:640px){
+    header { position:sticky; top:0; }
+    .brand-wrap { align-items:flex-start; flex-direction:column; }
+    .battle-mode-switch { width:100%; }
+    .battle-mode-switch button { flex:1; }
+    #syncText { display:none; }
+    .account-chip { padding:8px 10px; }
+    main { padding-left:10px; padding-right:10px; }
+    .mode-page-title { margin-left:2px; }
+    .panel { padding:15px; margin-bottom:14px; }
+    .panel-title-row { margin-bottom:14px; }
+    h2 { font-size:18px; }
+    .hint { font-size:12px; line-height:1.5; }
+    .preset-box { padding:12px; }
+    .preset-controls { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+    .entry-grid { grid-template-columns:1fr; gap:9px; }
+    .entry-card { min-height:78px; }
+    .entry-card.editing { min-height:120px; }
+    .entry-bottom-row { flex-direction:column; gap:10px; }
+    .entry-bottom-row .toolbar, .roster-edit-button-row { width:100%; margin-left:0; }
+    #selectionToolbar { display:grid; grid-template-columns:1fr; width:100%; }
+    #confirmTeamBtn, .roster-edit-btn, #editToolbar button { width:100%; }
+    .battle-row { grid-template-columns:1fr; padding:14px 0; gap:9px; }
+    .battle-pokemon-name { font-size:16px; }
+    .kill-counter { grid-template-columns:64px minmax(0,1fr) 64px; gap:8px; }
+    .counter-btn, .kill-value { height:60px; }
+    .counter-btn { font-size:28px; }
+    .kill-value { font-size:25px; }
+    .result-choice { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .result-choice label { justify-content:center; padding:11px 8px; }
+    .saved-actions .toolbar { display:grid; grid-template-columns:1fr; }
+    .saved-actions button { width:100%; min-height:48px; }
+    .summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .summary-card { padding:13px; }
+    .summary-card .value { font-size:21px; }
+    table { min-width:680px; }
+    .panel:has(table) { overflow:hidden; }
+    .panel:has(table) > table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
+    th,td { padding:10px 8px; white-space:nowrap; }
+    .history-item { padding:12px; }
+    .history-team { line-height:1.65; }
+    .history-actions { display:grid; grid-template-columns:1fr 1fr; width:100%; }
+    .small-btn { width:100%; }
+    .modal-member { grid-template-columns:1fr; gap:8px; }
+    .modal .kill-counter { grid-template-columns:56px minmax(0,1fr) 56px; }
+    .modal .counter-btn,.modal .kill-value { height:52px; }
+    .member-name-wrap { flex-wrap:wrap; }
+    .member-name-wrap .mini { min-height:42px; }
+    .login-screen { padding:max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); align-items:flex-start; overflow:auto; }
+    .login-card { margin-top:6vh; padding:20px; border-radius:16px; }
+    .login-card h1 { font-size:22px; }
+    .login-field input { min-height:48px; font-size:16px; }
+    .login-btn { min-height:50px; }
+  }
+
+  @media(max-width:390px){
+    header h1 { font-size:17px; }
+    .battle-mode-switch button { font-size:12px; padding-left:8px; padding-right:8px; }
+    .summary-grid { grid-template-columns:1fr 1fr; }
+    .preset-controls { grid-template-columns:1fr 1fr; }
+    .preset-controls button { font-size:12px; }
+  }
+
+</style>
+</head>
+<body data-mode="single">
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <h1>포켓몬 배틀 레코드</h1>
+    <p>닉네임과 숫자 4자리 PIN으로 로그인합니다. 처음 쓰는 닉네임이면 새 계정이 만들어지고, 이미 존재하는 닉네임이면 기존 PIN이 맞아야 접속됩니다.</p>
+    <div class="login-field"><label for="loginNickname">닉네임</label><input id="loginNickname" maxlength="20" autocomplete="username" placeholder="2~20자"></div>
+    <div class="login-field"><label for="loginPin">비밀번호 PIN 4자리</label><input id="loginPin" class="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="current-password" placeholder="••••"></div>
+    <button id="loginBtn" class="login-btn" onclick="loginOrRegister()">로그인 / 새 계정 시작</button>
+    <div id="loginMessage" class="login-message"></div>
+    <div class="setup-note" style="margin-top:14px;">전적과 프리셋은 계정별로 클라우드에 자동 저장됩니다. 같은 닉네임과 PIN으로 PC·Android·iPhone/iPad에서 이어서 사용할 수 있습니다.</div>
+  </div>
+</div>
+<div id="appShell" class="app-shell locked">
+<header>
+  <div class="brand-wrap">
+    <h1>포켓몬 배틀 레코드</h1>
+    <div class="battle-mode-switch" aria-label="배틀 모드 전환">
+      <button id="singleModeBtn" class="active" onclick="switchBattleMode('single')">싱글배틀</button>
+      <button id="doubleModeBtn" class="double" onclick="switchBattleMode('double')">더블배틀</button>
+    </div>
+  </div>
+  <div class="account-area"><div class="account-chip"><span id="syncDot" class="sync-dot"></span><span id="accountNickname">-</span><span id="syncText" style="color:#c7ced6;font-weight:600;">대기</span></div><button class="logout-btn" onclick="logoutAccount()">로그아웃</button></div>
+  <nav>
+    <button id="navRecord" class="active" onclick="showPage('record')">전적 기록</button>
+    <button id="navStats" onclick="showPage('stats')">전적 통계</button>
+  </nav>
+</header>
+
+<main>
+  <div class="mode-page-title"><span class="mode-dot"></span><span id="modePageLabel">싱글배틀 · 3마리 선출</span></div>
+
+  <section id="recordPage" class="page active">
+    <div class="panel">
+      <div class="panel-title-row">
+        <h2>1. 내 엔트리</h2>
+      </div>
+
+      <div class="preset-box">
+        <div class="preset-head"><strong>엔트리 프리셋</strong><span class="hint">다른 파티를 쓸 때 저장해두고 즉시 불러올 수 있습니다.</span></div>
+        <div class="preset-controls">
+          <select id="presetSelect" onchange="onPresetSelectionChanged()"></select>
+          <button class="mini" onclick="saveNewPreset()">새로 저장</button>
+          <button class="mini" onclick="loadSelectedPreset()">불러오기</button>
+          <button class="mini" onclick="updateSelectedPreset()">덮어쓰기</button>
+          <button class="mini" onclick="deleteSelectedPreset()">삭제</button>
+        </div>
+        <div id="presetPreview" class="preset-preview">
+          <div class="preset-preview-title">선택한 프리셋 구성</div>
+          <div id="presetPreviewList" class="preset-preview-list"></div>
+        </div>
+        <div id="presetStatus" class="hint" style="min-height:20px;margin-top:8px;"></div>
+      </div>
+
+      <div id="rosterModeHint" class="hint mode-hint"></div>
+      <div class="entry-grid" id="entryGrid"></div>
+      <div class="entry-bottom-row">
+        <div id="selectionToolbar" class="toolbar">
+          <button id="confirmTeamBtn" class="primary" onclick="confirmTeam()" disabled></button>
+          <span id="selectionText" class="hint"></span>
+        </div>
+        <div id="editToolbar" class="toolbar" style="display:none;">
+          <button class="primary" onclick="finishRosterEdit()">수정 완료</button>
+          <button class="outline-danger" onclick="resetRoster()">엔트리 전체 초기화</button>
+          <span class="hint">이름 입력 후 Enter를 눌러도 바로 선출 모드로 돌아갑니다.</span>
+        </div>
+        <div class="roster-edit-button-row">
+          <button id="editRosterBtn" class="roster-edit-btn" onclick="toggleRosterEdit()">엔트리 수정</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel battle-form" id="battleForm">
+      <h2>2. 경기 결과 입력</h2>
+      <p class="hint">선출한 포켓몬별 킬 수와 경기 승패를 입력한 뒤 저장하세요.</p>
+      <div id="killInputs"></div>
+      <div class="result-choice">
+        <label><input type="radio" name="result" value="win"> 승리</label>
+        <label><input type="radio" name="result" value="loss"> 패배</label>
+      </div>
+      <div class="toolbar" id="battleSaveToolbar">
+        <button class="primary" onclick="saveBattle()">이 경기 저장</button>
+        <button class="secondary" onclick="resetBattleForm()">선출 다시 고르기</button>
+      </div>
+      <div id="savedActions" class="saved-actions">
+        <div class="saved-message">경기가 저장되었습니다.</div>
+        <div class="toolbar" style="margin-top:0;">
+          <button class="primary" onclick="startNextBattle()">다음 경기 기록</button>
+          <button class="secondary" onclick="showPage('stats')">전적 통계 보기</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="statsPage" class="page">
+    <div class="panel">
+      <h2 id="statsTitle" style="margin-bottom:18px;">싱글배틀 전체 전적</h2>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="label">총 경기</div><div id="totalGames" class="value">0</div></div>
+        <div class="summary-card"><div class="label">승</div><div id="totalWins" class="value">0</div></div>
+        <div class="summary-card"><div class="label">패</div><div id="totalLosses" class="value">0</div></div>
+        <div class="summary-card"><div class="label">전체 승률</div><div id="overallWinRate" class="value">0%</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2 style="margin-bottom:18px;">포켓몬별 통계</h2>
+      <table>
+        <thead><tr><th>포켓몬</th><th>출전 횟수</th><th>승</th><th>패</th><th>승률</th><th>킬 수</th><th>경기당 킬</th></tr></thead>
+        <tbody id="pokemonStatsBody"></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <div class="panel-title-row"><h2>경기 기록</h2><button class="danger" onclick="clearAllRecords()">전체 기록 삭제</button></div>
+      <div id="historyList"></div>
+    </div>
+  </section>
+</main>
+
+<div id="editBattleModal" class="modal-backdrop" onclick="backdropClose(event)">
+  <div class="modal">
+    <div class="panel-title-row"><h2>경기 기록 수정</h2><button class="small-btn" onclick="closeBattleEdit()">닫기</button></div>
+    <div class="hint" style="margin-bottom:8px;">포켓몬 이름 옆의 ‘이름 수정’을 누르면 과거 경기의 이름도 직접 고칠 수 있습니다.</div>
+    <div id="editBattleMembers"></div>
+    <div class="result-choice">
+      <label><input type="radio" name="editResult" value="win"> 승리</label>
+      <label><input type="radio" name="editResult" value="loss"> 패배</label>
+    </div>
+    <div class="toolbar"><button class="primary" onclick="saveBattleEdit()">수정 저장</button><button class="secondary" onclick="closeBattleEdit()">취소</button></div>
+  </div>
+</div>
+</div><!-- /appShell -->
+
+<script>
+const DEFAULT_NAMES = ['포켓몬 1','포켓몬 2','포켓몬 3','포켓몬 4','포켓몬 5','포켓몬 6'];
+const LEGACY_STORAGE_KEY = 'pokemonBattleTrackerV3';
+const CLOUD_SESSION_STORAGE_KEY = 'pokemonBattleCloudSessionV1';
+const CLOUD_URL = 'https://rzwgsoficyoavsvuwlfj.supabase.co';
+const CLOUD_PUBLISHABLE_KEY = 'sb_publishable_nDrTccyAzsFLq29svahKkg_PuJU3uTm';
+const MODE_CONFIG = {
+  single:{label:'싱글배틀', pickCount:3},
+  double:{label:'더블배틀', pickCount:4}
+};
+
+function freshMode(){ return { roster:DEFAULT_NAMES.slice(), presets:[], battles:[] }; }
+function freshState(){ return {single:freshMode(),double:freshMode()}; }
+function normalizeState(raw){
+  const out=freshState();
+  for(const mode of ['single','double']){
+    const src=raw?.[mode];
+    if(!src) continue;
+    if(Array.isArray(src.roster) && src.roster.length===6) out[mode].roster=src.roster.map((v,i)=>typeof v==='string'?v:DEFAULT_NAMES[i]);
+    if(Array.isArray(src.presets)) out[mode].presets=src.presets;
+    if(Array.isArray(src.battles)) out[mode].battles=src.battles;
+  }
+  return out;
+}
+function getLegacyState(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY)||'null');
+    if(saved?.single && saved?.double) return normalizeState(saved);
+  }catch(e){}
+  let oldRoster=null,oldBattles=null;
+  try{oldRoster=JSON.parse(localStorage.getItem('pokemonRoster')||'null');}catch(e){}
+  try{oldBattles=JSON.parse(localStorage.getItem('pokemonBattles')||'null');}catch(e){}
+  if(Array.isArray(oldRoster)||Array.isArray(oldBattles)){
+    const migrated=freshState();
+    if(Array.isArray(oldRoster)&&oldRoster.length===6) migrated.single.roster=oldRoster.map((v,i)=>typeof v==='string'?v:(v?.name||DEFAULT_NAMES[i]));
+    if(Array.isArray(oldBattles)) migrated.single.battles=oldBattles;
+    return migrated;
+  }
+  return null;
+}
+
+let state=freshState();
+let battleMode=localStorage.getItem('pokemonBattleMode')==='double'?'double':'single';
+let currentPage='record';
+let selected=[];
+let rosterEditMode=false;
+let editingBattleId=null;
+let cloudSessionToken='';
+let cloudNickname='';
+let saveQueue=Promise.resolve();
+
+function getCloudConfig(){
+  return {url:CLOUD_URL,key:CLOUD_PUBLISHABLE_KEY};
+}
+function rememberCloudSession(){
+  if(!cloudSessionToken) return;
+  try{
+    localStorage.setItem(CLOUD_SESSION_STORAGE_KEY, JSON.stringify({token:cloudSessionToken,nickname:cloudNickname||''}));
+  }catch(e){ console.warn('세션 저장 실패',e); }
+}
+function forgetCloudSession(){
+  try{ localStorage.removeItem(CLOUD_SESSION_STORAGE_KEY); }catch(e){}
+}
+function readRememberedCloudSession(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(CLOUD_SESSION_STORAGE_KEY)||'null');
+    if(saved && typeof saved.token==='string' && saved.token) return saved;
+  }catch(e){}
+  return null;
+}
+async function restoreCloudSession(){
+  const saved=readRememberedCloudSession();
+  if(!saved) return false;
+  cloudSessionToken=saved.token;
+  cloudNickname=saved.nickname||'';
+  setLoginMessage('저장된 로그인 정보를 확인하는 중입니다...',false);
+  try{
+    const loaded=await rpc('pokemon_load',{p_token:cloudSessionToken});
+    if(!loaded?.ok){
+      forgetCloudSession();
+      cloudSessionToken=''; cloudNickname='';
+      setLoginMessage(loaded?.message||'로그인이 만료되었습니다. 다시 로그인해주세요.',true);
+      return false;
+    }
+    state=normalizeState(loaded.data);
+    document.getElementById('accountNickname').textContent=cloudNickname||'로그인 사용자';
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('appShell').classList.remove('locked');
+    setSyncStatus('saved','동기화됨');
+    updateAllUI();
+    return true;
+  }catch(e){
+    cloudSessionToken=''; cloudNickname='';
+    setLoginMessage('자동 로그인 중 서버에 연결하지 못했습니다. 잠시 후 새로고침하거나 다시 로그인해주세요.',true);
+    return false;
+  }
+}
+
+function setLoginMessage(msg,isError=false){
+  const el=document.getElementById('loginMessage');el.textContent=msg;el.className='login-message '+(isError?'error':'ok');
+}
+function setSyncStatus(kind,text){
+  const dot=document.getElementById('syncDot'),label=document.getElementById('syncText');
+  if(!dot||!label)return;dot.className='sync-dot '+kind;label.textContent=text;
+}
+async function rpc(name,body){
+  const {url,key}=getCloudConfig();
+  if(!url||!key) throw new Error('클라우드 설정이 없습니다.');
+  const res=await fetch(`${url}/rest/v1/rpc/${name}`,{method:'POST',headers:{'Content-Type':'application/json','apikey':key,'Authorization':`Bearer ${key}`},body:JSON.stringify(body)});
+  let data=null;try{data=await res.json();}catch(e){}
+  if(!res.ok) throw new Error(data?.message||data?.hint||`서버 오류 (${res.status})`);
+  return data;
+}
+async function loginOrRegister(){
+  const nickname=document.getElementById('loginNickname').value.trim();
+  const pin=document.getElementById('loginPin').value.trim();
+  if(nickname.length<2||nickname.length>20){setLoginMessage('닉네임은 2~20자로 입력해주세요.',true);return;}
+  if(!/^\d{4}$/.test(pin)){setLoginMessage('PIN은 숫자 4자리로 입력해주세요.',true);return;}
+  const btn=document.getElementById('loginBtn');btn.disabled=true;setLoginMessage('계정을 확인하는 중입니다...',false);
+  try{
+    const result=await rpc('pokemon_login_or_register',{p_nickname:nickname,p_pin:pin});
+    if(!result?.ok){setLoginMessage(result?.message||'로그인하지 못했습니다.',true);return;}
+    cloudSessionToken=result.token;cloudNickname=result.nickname||nickname;
+    rememberCloudSession();
+    const loaded=await rpc('pokemon_load',{p_token:cloudSessionToken});
+    if(!loaded?.ok) throw new Error(loaded?.message||'데이터를 불러오지 못했습니다.');
+    const cloudHasData=loaded.data && loaded.data.single && loaded.data.double;
+    if(result.created && !cloudHasData){
+      const legacy=getLegacyState();
+      if(legacy && confirm('이 브라우저에 기존 포켓몬 배틀 레코드 데이터가 있습니다.\n새 계정으로 기존 엔트리·프리셋·전적을 가져올까요?')) state=legacy;
+      else state=freshState();
+      await cloudSaveSnapshot(state);
+    }else state=normalizeState(loaded.data);
+    document.getElementById('accountNickname').textContent=cloudNickname;
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('appShell').classList.remove('locked');
+    document.getElementById('loginPin').value='';
+    setSyncStatus('saved','동기화됨');
+    updateAllUI();
+  }catch(e){setLoginMessage(e.message||'클라우드에 연결하지 못했습니다.',true);}
+  finally{btn.disabled=false;}
+}
+async function cloudSaveSnapshot(snapshot){
+  if(!cloudSessionToken) throw new Error('로그인이 필요합니다.');
+  const result=await rpc('pokemon_save',{p_token:cloudSessionToken,p_data:snapshot});
+  if(!result?.ok){
+    if(result?.code==='session_expired') forceRelogin(result.message);
+    throw new Error(result?.message||'클라우드 저장 실패');
+  }
+}
+function saveState(){
+  if(!cloudSessionToken){setSyncStatus('error','로그인 필요');return false;}
+  const snapshot=JSON.parse(JSON.stringify(state));
+  setSyncStatus('syncing','저장 중');
+  saveQueue=saveQueue.then(()=>cloudSaveSnapshot(snapshot)).then(()=>setSyncStatus('saved','동기화됨')).catch(e=>{console.error(e);setSyncStatus('error','저장 실패');});
+  return true;
+}
+function forceRelogin(message='로그인이 만료되었습니다.'){
+  forgetCloudSession();
+  cloudSessionToken='';cloudNickname='';state=freshState();
+  document.getElementById('appShell').classList.add('locked');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  setLoginMessage(message,true);
+}
+async function logoutAccount(){
+  const token=cloudSessionToken;
+  try{await saveQueue;if(token)await rpc('pokemon_logout',{p_token:token});}catch(e){}
+  forceRelogin('로그아웃했습니다.');
+}
+function modeData(){ return state[battleMode]; }
+function showPresetStatus(message, isError=false){
+  const el=document.getElementById('presetStatus');
+  if(!el) return;
+  el.textContent=message;
+  el.style.color=isError?'#c62828':'#2563eb';
+  clearTimeout(showPresetStatus._timer);
+  showPresetStatus._timer=setTimeout(()=>{el.textContent='';},2500);
+}
+function pickCount(){ return MODE_CONFIG[battleMode].pickCount; }
+function escapeHtml(text){ return String(text??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+function escapeAttr(text){ return escapeHtml(text); }
+function displayName(i){ return (modeData().roster[i]||'').trim() || `빈 슬롯 ${i+1}`; }
+
+function switchBattleMode(mode){
+  if(mode===battleMode) return;
+  battleMode = mode;
+  localStorage.setItem('pokemonBattleMode', mode);
+  selected = [];
+  rosterEditMode = false;
+  editingBattleId = null;
+  closeBattleEdit();
+  document.getElementById('battleForm').classList.remove('active');
+  document.getElementById('savedActions').classList.remove('active');
+  updateAllUI();
+}
+
+function updateAllUI(){
+  document.body.dataset.mode = battleMode;
+  document.getElementById('singleModeBtn').classList.toggle('active', battleMode==='single');
+  document.getElementById('doubleModeBtn').classList.toggle('active', battleMode==='double');
+  document.getElementById('modePageLabel').textContent = `${MODE_CONFIG[battleMode].label} · ${pickCount()}마리 선출`;
+  document.getElementById('statsTitle').textContent = `${MODE_CONFIG[battleMode].label} 전체 전적`;
+  updateRosterModeUI();
+  renderPresetSelect();
+  renderEntryGrid();
+  if(currentPage==='stats') renderStats();
+}
+
+function showPage(page){
+  currentPage = page;
+  document.getElementById('recordPage').classList.toggle('active',page==='record');
+  document.getElementById('statsPage').classList.toggle('active',page==='stats');
+  document.getElementById('navRecord').classList.toggle('active',page==='record');
+  document.getElementById('navStats').classList.toggle('active',page==='stats');
+  if(page==='stats') renderStats();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function renderPresetSelect(){
+  const select = document.getElementById('presetSelect');
+  const previous = select.value;
+  select.innerHTML = '<option value="">프리셋 선택</option>';
+  modeData().presets.forEach(p=>{
+    const opt=document.createElement('option'); opt.value=String(p.id); opt.textContent=p.name; select.appendChild(opt);
+  });
+  if(modeData().presets.some(p=>String(p.id)===previous)) select.value=previous;
+  renderPresetPreview();
+}
+function renderPresetPreview(){
+  const box=document.getElementById('presetPreview');
+  const list=document.getElementById('presetPreviewList');
+  const p=selectedPreset();
+  if(!p){
+    box.classList.remove('show');
+    list.innerHTML='';
+    return;
+  }
+  list.innerHTML='';
+  (p.roster||[]).forEach((name,i)=>{
+    const chip=document.createElement('span');
+    chip.className='preset-preview-chip';
+    chip.textContent=(name&&name.trim()) ? name : `빈 슬롯 ${i+1}`;
+    list.appendChild(chip);
+  });
+  box.classList.add('show');
+}
+function onPresetSelectionChanged(){
+  renderPresetPreview();
+}
+function selectedPreset(){
+  const id=document.getElementById('presetSelect').value;
+  return modeData().presets.find(p=>String(p.id)===id);
+}
+function saveNewPreset(){
+  const name=prompt('새 프리셋 이름을 입력해주세요.');
+  if(!name || !name.trim()) return;
+  const preset={id:Date.now()+Math.floor(Math.random()*1000),name:name.trim(),roster:modeData().roster.slice()};
+  modeData().presets.push(preset);
+  const ok=saveState();
+  renderPresetSelect();
+  document.getElementById('presetSelect').value=String(preset.id);
+  renderPresetPreview();
+  if(ok) showPresetStatus(`'${preset.name}' 프리셋이 저장되었습니다.`);
+  else showPresetStatus('브라우저 저장소에 저장하지 못했습니다. 현재 탭에서는 유지되지만, 다시 열면 사라질 수 있습니다.',true);
+}
+function sameRoster(a,b){
+  if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length) return false;
+  return a.every((name,i)=>(name||'').trim()===(b[i]||'').trim());
+}
+function currentRosterIsSaved(){
+  return modeData().presets.some(p=>sameRoster(modeData().roster,p.roster));
+}
+function saveCurrentRosterAsPreset(){
+  const name=prompt('현재 엔트리를 저장할 프리셋 이름을 입력해주세요.');
+  if(!name || !name.trim()) return false;
+  const preset={id:Date.now()+Math.floor(Math.random()*1000),name:name.trim(),roster:modeData().roster.slice()};
+  modeData().presets.push(preset);
+  const ok=saveState();
+  renderPresetSelect();
+  document.getElementById('presetSelect').value=String(preset.id);
+  renderPresetPreview();
+  if(ok) showPresetStatus(`'${preset.name}' 프리셋이 저장되었습니다.`);
+  else showPresetStatus('브라우저 저장소에 저장하지 못했습니다.',true);
+  return ok;
+}
+function loadSelectedPreset(){
+  const p=selectedPreset(); if(!p){alert('불러올 프리셋을 선택해주세요.');return;}
+
+  // 현재 엔트리가 어떤 프리셋에도 저장되어 있지 않다면 덮어쓰기 전에 저장 여부를 확인
+  if(!currentRosterIsSaved()){
+    const wantsSave=confirm('현재 엔트리는 프리셋에 저장되어 있지 않습니다.\n현재 엔트리를 먼저 저장하시겠습니까?');
+    if(wantsSave){
+      const saved=saveCurrentRosterAsPreset();
+      if(!saved) return;
+      // 새 프리셋 저장으로 선택값이 바뀌므로 원래 불러오려던 프리셋을 다시 찾음
+      const target=modeData().presets.find(x=>x.id===p.id);
+      if(!target) return;
+      if(!confirm(`'${target.name}' 프리셋을 현재 엔트리로 불러올까요?`)) return;
+      modeData().roster=target.roster.slice(); selected=[]; saveState(); renderEntryGrid();
+      document.getElementById('presetSelect').value=String(target.id);
+      renderPresetPreview();
+      return;
+    }
+  }
+
+  if(!confirm(`'${p.name}' 프리셋을 현재 엔트리로 불러올까요?`)) return;
+  modeData().roster=p.roster.slice(); selected=[]; saveState(); renderEntryGrid();
+  document.getElementById('presetSelect').value=String(p.id);
+  renderPresetPreview();
+}
+function updateSelectedPreset(){
+  const p=selectedPreset(); if(!p){alert('덮어쓸 프리셋을 선택해주세요.');return;}
+  const newName=prompt('프리셋 이름을 수정할 수 있습니다.',p.name);
+  if(newName===null || !newName.trim()) return;
+  p.name=newName.trim(); p.roster=modeData().roster.slice();
+  const ok=saveState();
+  renderPresetSelect(); document.getElementById('presetSelect').value=String(p.id);
+  renderPresetPreview();
+  if(ok) showPresetStatus(`'${p.name}' 프리셋을 현재 엔트리로 덮어썼습니다.`);
+  else showPresetStatus('브라우저 저장소에 덮어쓰지 못했습니다.',true);
+}
+function deleteSelectedPreset(){
+  const p=selectedPreset(); if(!p){alert('삭제할 프리셋을 선택해주세요.');return;}
+  if(!confirm(`'${p.name}' 프리셋을 삭제할까요?`)) return;
+  modeData().presets=modeData().presets.filter(x=>x.id!==p.id); saveState(); renderPresetSelect();
+}
+
+function renderEntryGrid(){
+  const grid=document.getElementById('entryGrid'); grid.innerHTML='';
+  modeData().roster.forEach((name,i)=>{
+    const isEmpty=!(name||'').trim();
+    const card=document.createElement('div');
+    card.className='entry-card'+(selected.includes(i)?' selected':'')+(rosterEditMode?' editing':'')+(isEmpty?' empty-slot':'');
+    if(!rosterEditMode){
+      card.onclick=()=>toggleSelect(i);
+      card.innerHTML=`<div class="select-row"><strong>${escapeHtml(displayName(i))}</strong><span class="select-badge">${selected.includes(i)?'선출':'미선출'}</span></div>`;
+    } else {
+      card.innerHTML=`<div class="select-row"><strong>슬롯 ${i+1}</strong><span class="select-badge">수정</span></div><input type="text" value="${escapeAttr(name||'')}" maxlength="30" placeholder="포켓몬 이름"><div class="entry-edit-actions"><button class="small-btn delete" type="button">삭제</button></div>`;
+      const input=card.querySelector('input');
+      input.addEventListener('input',e=>{modeData().roster[i]=e.target.value.trimStart();saveState();});
+      input.addEventListener('keydown',e=>{
+        if(e.key==='Enter'){
+          e.preventDefault();
+          modeData().roster[i]=e.target.value.trim();
+          saveState();
+          finishRosterEdit();
+        }
+      });
+      card.querySelector('.delete').onclick=()=>deleteRosterSlot(i);
+    }
+    grid.appendChild(card);
+  });
+  updateSelectionUI();
+}
+function toggleRosterEdit(){ rosterEditMode=!rosterEditMode; if(rosterEditMode){selected=[];document.getElementById('battleForm').classList.remove('active');} updateRosterModeUI();renderEntryGrid(); }
+function finishRosterEdit(){ rosterEditMode=false;saveState();updateRosterModeUI();renderEntryGrid(); }
+function updateRosterModeUI(){
+  const n=pickCount();
+  document.getElementById('editRosterBtn').textContent=rosterEditMode?'선출 모드로 돌아가기':'엔트리 수정';
+  document.getElementById('rosterModeHint').textContent=rosterEditMode?'이름을 수정하거나 슬롯을 삭제할 수 있습니다. 변경 내용은 자동 저장됩니다.':`포켓몬을 클릭해 이번 경기에 선출할 ${n}마리를 선택하세요.`;
+  document.getElementById('selectionToolbar').style.display=rosterEditMode?'none':'flex';
+  document.getElementById('editToolbar').style.display=rosterEditMode?'flex':'none';
+  document.getElementById('confirmTeamBtn').textContent=`선출 ${n}마리 OK`;
+}
+function deleteRosterSlot(i){
+  const roster=modeData().roster; if(!(roster[i]||'').trim()) return;
+  if(!confirm(`'${roster[i]}'을(를) 엔트리에서 삭제할까요?\n과거 경기 기록은 삭제되지 않습니다.`)) return;
+  roster[i]=''; saveState(); renderEntryGrid();
+}
+function resetRoster(){
+  if(!confirm(`${MODE_CONFIG[battleMode].label} 엔트리 6칸을 모두 기본 상태로 초기화할까요?\n프리셋과 과거 경기 기록은 삭제되지 않습니다.`)) return;
+  modeData().roster=DEFAULT_NAMES.slice(); selected=[];saveState();renderEntryGrid();
+}
+function toggleSelect(i){
+  if(rosterEditMode) return;
+  if(!(modeData().roster[i]||'').trim()){alert('빈 슬롯은 선출할 수 없습니다.');return;}
+  const idx=selected.indexOf(i);
+  if(idx>=0) selected.splice(idx,1); else {if(selected.length>=pickCount()) return; selected.push(i);}
+  renderEntryGrid();
+}
+function updateSelectionUI(){
+  const n=pickCount();
+  document.getElementById('selectionText').textContent=`${selected.length} / ${n}마리 선택됨`;
+  document.getElementById('confirmTeamBtn').disabled=selected.length!==n;
+}
+
+function counterHTML(value,dataAttr=''){
+  return `<div class="kill-counter"><button class="counter-btn" type="button" onclick="changeCounter(this,-1)">−</button><input class="kill-value" type="number" min="0" step="1" value="${Number(value)||0}" ${dataAttr}><button class="counter-btn" type="button" onclick="changeCounter(this,1)">+</button></div>`;
+}
+function changeCounter(btn,delta){ const input=btn.closest('.kill-counter').querySelector('.kill-value'); let v=parseInt(input.value,10);if(!Number.isInteger(v))v=0;input.value=Math.max(0,v+delta); }
+function confirmTeam(){
+  if(selected.length!==pickCount()) return;
+  const container=document.getElementById('killInputs'); container.innerHTML='';
+  selected.forEach(index=>{
+    const name=modeData().roster[index]; const row=document.createElement('div');row.className='battle-row';
+    row.innerHTML=`<div class="battle-pokemon-name"><strong>${escapeHtml(name)}</strong></div>${counterHTML(0,`data-index="${index}" data-name="${escapeAttr(name)}"`)}`;
+    container.appendChild(row);
+  });
+  document.querySelectorAll('input[name="result"]').forEach(r=>r.checked=false);
+  document.getElementById('savedActions').classList.remove('active');
+  document.getElementById('battleSaveToolbar').style.display='flex';
+  document.getElementById('battleForm').classList.add('active');
+  document.getElementById('battleForm').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function saveBattle(){
+  const resultEl=document.querySelector('input[name="result"]:checked'); if(!resultEl){alert('승리 또는 패배를 선택해주세요.');return;}
+  const members=[]; let valid=true;
+  document.querySelectorAll('#killInputs .kill-value').forEach(input=>{
+    const kills=Number(input.value); if(!Number.isInteger(kills)||kills<0)valid=false;
+    const index=Number(input.dataset.index); members.push({slot:index,name:input.dataset.name||modeData().roster[index]||`포켓몬 ${index+1}`,kills});
+  });
+  if(!valid){alert('킬 수는 0 이상의 정수로 입력해주세요.');return;}
+  modeData().battles.push({id:Date.now()+Math.floor(Math.random()*1000),date:new Date().toISOString(),result:resultEl.value,members});
+  saveState();
+  document.getElementById('battleSaveToolbar').style.display='none';
+  document.getElementById('savedActions').classList.add('active');
+}
+function startNextBattle(){ resetBattleForm(); window.scrollTo({top:0,behavior:'smooth'}); }
+function resetBattleForm(){ selected=[];document.getElementById('battleForm').classList.remove('active');document.getElementById('savedActions').classList.remove('active');document.getElementById('battleSaveToolbar').style.display='flex';renderEntryGrid(); }
+
+function renderStats(){
+  const battles=modeData().battles;
+  const total=battles.length,wins=battles.filter(b=>b.result==='win').length,losses=total-wins;
+  document.getElementById('totalGames').textContent=total;document.getElementById('totalWins').textContent=wins;document.getElementById('totalLosses').textContent=losses;document.getElementById('overallWinRate').textContent=total?`${(wins/total*100).toFixed(1)}%`:'0%';
+  const statsMap=new Map();
+  modeData().roster.filter(n=>(n||'').trim()).forEach(name=>{if(!statsMap.has(name))statsMap.set(name,{name,games:0,wins:0,losses:0,kills:0});});
+  battles.forEach(b=>(b.members||[]).forEach(m=>{
+    const name=(m.name||'').trim()||`포켓몬 ${(m.slot??0)+1}`;
+    if(!statsMap.has(name))statsMap.set(name,{name,games:0,wins:0,losses:0,kills:0});
+    const s=statsMap.get(name);s.games++;if(b.result==='win')s.wins++;else s.losses++;s.kills+=Number(m.kills)||0;
+  }));
+  const stats=[...statsMap.values()].sort((a,b)=>b.games-a.games||b.kills-a.kills||a.name.localeCompare(b.name,'ko'));
+  const body=document.getElementById('pokemonStatsBody');body.innerHTML='';
+  if(!stats.length)body.innerHTML='<tr><td colspan="7" class="empty">표시할 포켓몬이 없습니다.</td></tr>';
+  else stats.forEach(s=>{
+    const tr=document.createElement('tr');tr.innerHTML=`<td><strong>${escapeHtml(s.name)}</strong></td><td>${s.games}</td><td>${s.wins}</td><td>${s.losses}</td><td>${s.games?(s.wins/s.games*100).toFixed(1)+'%':'-'}</td><td>${s.kills}</td><td>${s.games?(s.kills/s.games).toFixed(2):'-'}</td>`;body.appendChild(tr);
+  });
+  renderHistory();
+}
+function renderHistory(){
+  const battles=modeData().battles,list=document.getElementById('historyList');
+  if(!battles.length){list.innerHTML='<div class="empty">아직 저장된 경기가 없습니다.</div>';return;}
+  list.innerHTML='';[...battles].reverse().forEach(b=>{
+    const item=document.createElement('div');item.className='history-item';const d=new Date(b.date);const dateText=`${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const teamText=(b.members||[]).map(m=>`${escapeHtml(m.name)} ${Number(m.kills)||0}킬`).join(' · ');
+    item.innerHTML=`<div>${dateText}</div><div class="history-team">${teamText}</div><div class="${b.result==='win'?'win':'loss'}">${b.result==='win'?'승리':'패배'}</div><div class="history-actions"><button class="small-btn edit" onclick="openBattleEdit(${b.id})">수정</button><button class="small-btn delete" onclick="deleteBattle(${b.id})">삭제</button></div>`;list.appendChild(item);
+  });
+}
+function openBattleEdit(id){
+  const battle=modeData().battles.find(b=>b.id===id);if(!battle)return;editingBattleId=id;
+  const members=document.getElementById('editBattleMembers');members.innerHTML='';
+  (battle.members||[]).forEach((m,idx)=>{
+    const row=document.createElement('div');row.className='modal-member';
+    row.innerHTML=`<div class="member-name-wrap" data-member-index="${idx}"><span class="member-name-text">${escapeHtml(m.name)}</span><input class="member-name-input" type="text" value="${escapeAttr(m.name)}" maxlength="30"><button class="small-btn edit member-name-edit-btn" type="button" onclick="toggleMemberNameEdit(this)">이름 수정</button></div>${counterHTML(Number(m.kills)||0,`data-member-index="${idx}"`)}`;
+    members.appendChild(row);
+  });
+  document.querySelectorAll('input[name="editResult"]').forEach(r=>r.checked=r.value===battle.result);
+  document.getElementById('editBattleModal').classList.add('active');
+}
+function toggleMemberNameEdit(btn){
+  const wrap=btn.closest('.member-name-wrap'); const editing=wrap.classList.toggle('editing'); btn.textContent=editing?'완료':'이름 수정';
+  if(editing){const input=wrap.querySelector('.member-name-input');input.focus();input.select();}
+  else {const input=wrap.querySelector('.member-name-input');wrap.querySelector('.member-name-text').textContent=input.value.trim()||'이름 없음';}
+}
+function saveBattleEdit(){
+  const battle=modeData().battles.find(b=>b.id===editingBattleId);if(!battle)return;
+  const resultEl=document.querySelector('input[name="editResult"]:checked');if(!resultEl){alert('승리 또는 패배를 선택해주세요.');return;}
+  let valid=true;
+  document.querySelectorAll('#editBattleMembers .modal-member').forEach((row,idx)=>{
+    const kills=Number(row.querySelector('.kill-value').value); const name=row.querySelector('.member-name-input').value.trim();
+    if(!Number.isInteger(kills)||kills<0||!name)valid=false;
+    if(battle.members[idx]){battle.members[idx].kills=kills;battle.members[idx].name=name;}
+  });
+  if(!valid){alert('포켓몬 이름을 입력하고, 킬 수는 0 이상의 정수로 입력해주세요.');return;}
+  battle.result=resultEl.value;saveState();closeBattleEdit();renderStats();
+}
+function closeBattleEdit(){editingBattleId=null;document.getElementById('editBattleModal').classList.remove('active');}
+function backdropClose(e){if(e.target.id==='editBattleModal')closeBattleEdit();}
+function deleteBattle(id){if(!confirm('이 경기 기록을 삭제할까요?'))return;modeData().battles=modeData().battles.filter(b=>b.id!==id);saveState();renderStats();}
+function clearAllRecords(){if(!modeData().battles.length)return;if(!confirm(`${MODE_CONFIG[battleMode].label}의 모든 경기 기록을 삭제할까요?\n다른 배틀 모드의 기록과 엔트리, 프리셋은 유지됩니다.`))return;modeData().battles=[];saveState();renderStats();}
+
+async function initCloudApp(){
+  document.getElementById('loginNickname').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPin').focus();});
+  document.getElementById('loginPin').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,4);});
+  document.getElementById('loginPin').addEventListener('keydown',e=>{if(e.key==='Enter')loginOrRegister();});
+  await restoreCloudSession();
+}
+initCloudApp();
+</script>
+</body>
+</html>
